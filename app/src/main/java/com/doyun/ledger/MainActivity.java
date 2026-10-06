@@ -41,8 +41,8 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(SURFACE);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        saved=getSharedPreferences("labels",MODE_PRIVATE);start=LocalDate.parse(saved.getString("ui_start",start.toString()));end=LocalDate.parse(saved.getString("ui_end",end.toString()));selectedDate=end;calendarMonth=YearMonth.from(end);
-        if(state!=null){start=LocalDate.parse(state.getString("start"));end=LocalDate.parse(state.getString("end"));selectedDate=LocalDate.parse(state.getString("selectedDate"));calendarMonth=YearMonth.parse(state.getString("calendarMonth"));selectedCategory=state.getInt("category",-2);}
+        saved=getSharedPreferences("labels",MODE_PRIVATE);start=LocalDate.parse(saved.getString("ui_start",start.toString()));end=LocalDate.now(ZoneId.of("Asia/Seoul"));selectedDate=end;calendarMonth=YearMonth.from(end);saved.edit().putString("ui_end",end.toString()).apply();
+        if(state!=null){start=LocalDate.parse(state.getString("start"));selectedCategory=state.getInt("category",-2);}
         root=column();root.setBackgroundColor(BG);root.setPadding(dp(18),0,dp(18),0);root.setOnApplyWindowInsetsListener((v,i)->{root.setPadding(dp(18),i.getSystemWindowInsetTop()+dp(12),dp(18),i.getSystemWindowInsetBottom());return i;});setContentView(root);
         addAppHeader();pager=new SwipePager(this);root.addView(pager,new LinearLayout.LayoutParams(-1,0,1));pager.addView(buildDashboard());pager.addView(buildCategoryPage());pager.addView(buildCalendarPage());addBottomNav();pager.setListener(this::selectNav);load();
     }
