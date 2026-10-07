@@ -15,13 +15,13 @@ public class RcsAccessibilityService extends AccessibilityService {
     private static final String MESSAGES="com.samsung.android.messaging", PREFIX=MESSAGES+":id/";
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Set<String> seen=new HashSet<>(), undated=new HashSet<>();
-    private boolean running, positioned;
+    private boolean running, positioned, endButtonAttempted;
     private boolean scrollAccepted=true;
     private Map<String,LocalDateTime> previousDates=new HashMap<>();
     private LocalDate from,to,anchor;
     private long began, missingSince;
-    private int pages, count, stuck;
-    private String previous="", stable="";
+    private int pages, count, stuck, positioningStuck;
+    private String previous="", stable="", positioningPrevious="";
     private RcsStore store;
     private LinearLayout overlay;
     private TextView progress;
@@ -39,7 +39,7 @@ public class RcsAccessibilityService extends AccessibilityService {
         if(running)return;
         from=start;to=end;anchor=LocalDate.now(ZoneId.of("Asia/Seoul"));
         if(to.isAfter(anchor))to=anchor;
-        seen.clear();undated.clear();previousDates.clear();scrollAccepted=true;pages=0;count=0;stuck=0;previous="";stable="";positioned=false;
+        seen.clear();undated.clear();previousDates.clear();scrollAccepted=true;pages=0;count=0;stuck=0;positioningStuck=0;previous="";stable="";positioningPrevious="";positioned=false;endButtonAttempted=false;
         began=SystemClock.elapsedRealtime();missingSince=began;running=true;store=new RcsStore(this);
         getSharedPreferences("rcs_import",0).edit().putBoolean("running",true).putString("status","삼성카드 대화를 여는 중…").apply();
         showOverlay();
@@ -97,11 +97,7 @@ public class RcsAccessibilityService extends AccessibilityService {
         missingSince=0;
         AccessibilityNodeInfo list=find(root,"bubble_list_view");
         if(list==null){next(600);return;}
-        if(!positioned){
-            AccessibilityNodeInfo bottom=find(root,"composer_scroll_to_end");
-            positioned=true;
-            if(bottom!=null && bottom.performAction(AccessibilityNodeInfo.ACTION_CLICK)){next(800);return;}
-        }
+        if(!positioned){positionAtNewest(root,list);return;}
         String signature=fingerprint(list);
         if(signature.isEmpty()){next(600);return;}
         if(!signature.equals(stable)){stable=signature;next(350);return;}
@@ -133,6 +129,21 @@ public class RcsAccessibilityService extends AccessibilityService {
         if(progress!=null)progress.setText("삼성카드 "+count+"건 · "+anchor+" 확인 중\n화면을 켜 두세요 · 중지 가능");
         if(oldest!=null && oldest.isBefore(from)){finish("선택 기간 불러오기 완료",true);return;}
         scrollAccepted=list.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);next(650);
+    }
+    private void positionAtNewest(AccessibilityNodeInfo root,AccessibilityNodeInfo list){
+        if(progress!=null)progress.setText("최신 메시지로 이동하는 중…\n이동이 끝나면 자동으로 읽기 시작합니다.");
+        if(!endButtonAttempted){
+            endButtonAttempted=true;AccessibilityNodeInfo bottom=find(root,"composer_scroll_to_end");
+            if(bottom!=null&&bottom.performAction(AccessibilityNodeInfo.ACTION_CLICK)){next(900);return;}
+        }
+        String signature=fingerprint(list);if(signature.isEmpty()){next(500);return;}
+        if(signature.equals(positioningPrevious))positioningStuck++;else{positioningPrevious=signature;positioningStuck=0;}
+        boolean moved=list.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+        if(!moved||positioningStuck>=3){
+            positioned=true;previous="";stable="";stuck=0;scrollAccepted=true;
+            if(progress!=null)progress.setText("최신 내역부터 읽는 중…");next(450);return;
+        }
+        next(350);
     }
     private void finish(String message,boolean complete){
         if(!running)return;running=false;handler.removeCallbacks(tick);
